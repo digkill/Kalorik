@@ -8,7 +8,7 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
     if let Some(text) = msg.text() {
         if text == "/start" {
             queries::register_user(chat_id.0).await.ok();
-            bot.send_message(chat_id, "🍽️ Добро пожаловать! Пиши, что ты ел — я всё посчитаю!").await?;
+            bot.send_message(chat_id, "🍽️ Добро пожаловать! Пиши, фотографируй или записывай аудио всё что ты ел — я всё посчитаю!").await?;
         } else {
             let result = crate::services::nutrition::analyze_food_description(text).await;
             bot.send_message(chat_id, result).await?;

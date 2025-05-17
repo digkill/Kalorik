@@ -15,3 +15,7 @@ teloxide = { version = "0.15.0", features = ["macros"] }
 log = "0.4"
 pretty_env_logger = "0.5"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
+
+[profile.release]
+strip = true
+opt-level = "z"

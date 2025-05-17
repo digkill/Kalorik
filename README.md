@@ -1,4 +1,4 @@
-# 🐹 Kalorik — Your Personal Nutrition Assistant Bot
+# 🐹 Kalorik  (Lite version) — Your Personal Nutrition Assistant Bot
 
 ![Kalorik banner](assets/kalorik-banner.png)
 
@@ -83,4 +83,4 @@ cargo run
 
 ## 📄 License
 
-MIT License © 2025 [YourName]
+MIT License © 2025 [Vitaliy Edifanov]

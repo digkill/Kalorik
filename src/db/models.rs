@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
@@ -13,5 +13,5 @@ pub struct User {
     pub gender: Option<String>,
     pub activity_level: Option<String>,
     pub goal: Option<String>,
-    pub created_at: Option<NaiveDateTime>,
+    pub created_at: DateTime<Utc>,
 }

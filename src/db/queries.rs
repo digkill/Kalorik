@@ -1,7 +1,7 @@
 use crate::db::models::User;
-use chrono::Utc;
 use sqlx::PgPool;
 use std::sync::OnceLock;
+use chrono::Utc;
 
 pub static DB_POOL: OnceLock<PgPool> = OnceLock::new();
 
@@ -25,7 +25,7 @@ pub async fn register_user(chat_id: i64) -> Result<(), sqlx::Error> {
         ON CONFLICT (chat_id) DO NOTHING
         "#,
         chat_id,
-        Utc::now().naive_utc()
+        Utc::now()
     )
         .execute(pool)
         .await?;

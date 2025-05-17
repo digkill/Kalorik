@@ -13,5 +13,7 @@ pub struct User {
     pub gender: Option<String>,
     pub activity_level: Option<String>,
     pub goal: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub language_code: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }

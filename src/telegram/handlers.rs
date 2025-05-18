@@ -38,7 +38,7 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
                 ]))
                 .await?;
         } else {
-            match crate::services::nutrition::analyze_food_description(text).await {
+            match crate::services::nutrition::analyze_food_description(text, &user_lang).await {
                 Ok((summary, suggestion)) => {
                     queries::add_food_log(
                         chat_id.0,
@@ -155,7 +155,7 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
             let token = std::env::var("TELEGRAM_BOT_TOKEN").unwrap();
             let url = format!("https://api.telegram.org/file/bot{}/{}", token, file.path);
 
-            match crate::services::nutrition::analyze_image(&url).await {
+            match crate::services::nutrition::analyze_image(&url, &user_lang).await {
                 Ok((summary, suggestion)) => {
                     queries::add_food_log(
                         chat_id.0,
@@ -195,7 +195,7 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
         let token = std::env::var("TELEGRAM_BOT_TOKEN").unwrap();
         let url = format!("https://api.telegram.org/file/bot{}/{}", token, file.path);
 
-        match crate::services::nutrition::analyze_audio(&url).await {
+        match crate::services::nutrition::analyze_audio(&url, &user_lang).await {
             Ok((summary, suggestion)) => {
                 queries::add_food_log(
                     chat_id.0,

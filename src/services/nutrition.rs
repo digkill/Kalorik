@@ -59,14 +59,31 @@ pub struct FoodSummary {
     pub carbs: Option<f32>,
 }
 
-pub async fn analyze_food_description(text: &str) -> Result<(FoodSummary, String), NutritionError> {
+pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSummary, String), NutritionError> {
+    let lang_prompt = match lang {
+        "ru" => "Отвечай на русском языке.",
+        "en" => "Answer in English.",
+        "th" => "ตอบเป็นภาษาไทย.",
+        "zh" => "请用中文回答。",
+        _ => "Answer in English.",
+    };
+
     let api_key = env::var("OPENAI_API_KEY")?;
     let body = serde_json::json!({
         "model": "gpt-4o",
-        "messages": [{
-            "role": "user",
-            "content": format!("Рассчитай калории и БЖУ для: {}", text)
-        }],
+        "messages": [
+            {
+                "role": "system",
+                "content": format!(
+                    "{} Ответ должен быть строго в формате JSON: {{\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}}",
+                    lang_prompt
+                )
+            },
+            {
+                "role": "user",
+                "content": format!("Рассчитай калории и БЖУ для: {}", text)
+            }
+        ],
         "temperature": 0.3
     });
 
@@ -110,14 +127,22 @@ fn extract_float(text: &str, key: &str) -> Option<f32> {
     val_str.parse::<f32>().ok()
 }
 
-pub async fn analyze_image(url: &str) -> Result<(FoodSummary, String), NutritionError> {
+pub async fn analyze_image(url: &str, lang: &str) -> Result<(FoodSummary, String), NutritionError> {
+    let lang_prompt = match lang {
+        "ru" => "Отвечай на русском языке.",
+        "en" => "Answer in English.",
+        "th" => "ตอบเป็นภาษาไทย.",
+        "zh" => "请用中文回答。",
+        _ => "Answer in English.",
+    };
+
     let api_key = env::var("OPENAI_API_KEY")?;
     let body = serde_json::json!({
         "model": "gpt-4o",
         "messages": [{
             "role": "user",
             "content": [
-                { "type": "text", "text": "Что изображено на этой еде? Сколько калорий и БЖУ?" },
+                { "type": "text", "text": format!("{} Что изображено на этой еде? Сколько калорий и БЖУ?", lang_prompt) },
                 { "type": "image_url", "image_url": { "url": url } }
             ]
         }],
@@ -156,7 +181,7 @@ pub async fn analyze_image(url: &str) -> Result<(FoodSummary, String), Nutrition
     ))
 }
 
-pub async fn analyze_audio(url: &str) -> Result<(FoodSummary, String), NutritionError> {
+pub async fn analyze_audio(url: &str, lang: &str) -> Result<(FoodSummary, String), NutritionError> {
     let api_key = env::var("OPENAI_API_KEY")?;
     let file_bytes = reqwest::get(url).await?.bytes().await?;
     let part = reqwest::multipart::Part::stream(file_bytes)
@@ -180,5 +205,5 @@ pub async fn analyze_audio(url: &str) -> Result<(FoodSummary, String), Nutrition
         .ok_or("No transcription text")?
         .to_string();
 
-    analyze_food_description(&text).await
+    analyze_food_description(&text, lang).await
 }

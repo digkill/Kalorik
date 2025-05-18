@@ -1,52 +1,62 @@
-use std::collections::HashMap;
-
 #[derive(Clone)]
 pub struct Messages {
     pub welcome: String,
     pub help: String,
     pub unknown: String,
+    pub reset_done: String,
+    pub week_empty: String,
+    pub graph_error: String,
+    pub error: String,
 }
 
 impl Messages {
     pub fn get(lang: &str) -> Self {
-        let mut langs = HashMap::new();
-
-        langs.insert(
-            "ru",
-            Messages {
-                welcome: "👋 Добро пожаловать! Отправь, что ты ел — и я всё посчитаю!".into(),
-                help: "ℹ️ Отправь текст, фото еды или голосовое сообщение, и я дам информацию по калориям, БЖУ и рекомендациям.".into(),
-                unknown: "⚠️ Пожалуйста, отправь текст, фото или голосовое сообщение.".into(),
+        match lang {
+            "en" => Messages {
+                welcome: "Welcome!".into(),
+                help: "This bot helps track calories.".into(),
+                unknown: "I didn't understand.".into(),
+                reset_done: "🔁 Your logs have been reset.".into(),
+                week_empty: "No data for the last 7 days.".into(),
+                graph_error: "❌ Error drawing the chart.".into(),
+                error: "❌ An error occurred.".into(),
             },
-        );
-
-        langs.insert(
-            "en",
-            Messages {
-                welcome: "👋 Welcome! Tell me what you ate — and I'll calculate everything!".into(),
-                help: "ℹ️ Send text, a food photo or a voice message, and I’ll provide calorie and nutrition info.".into(),
-                unknown: "⚠️ Please send text, a photo or a voice message.".into(),
+            "ru" => Messages {
+                welcome: "Добро пожаловать!".into(),
+                help: "Этот бот помогает считать калории.".into(),
+                unknown: "Я не понял команду.".into(),
+                reset_done: "🔁 Данные за сегодня сброшены.".into(),
+                week_empty: "Нет данных за последние 7 дней.".into(),
+                graph_error: "❌ Ошибка при построении графика.".into(),
+                error: "❌ Произошла ошибка.".into(),
             },
-        );
-
-        langs.insert(
-            "th",
-            Messages {
-                welcome: "👋 ยินดีต้อนรับ! บอกฉันว่าคุณกินอะไร — ฉันจะคำนวณให้หมดเลย!".into(),
-                help: "ℹ️ ส่งข้อความ รูปอาหาร หรือเสียงมา แล้วฉันจะบอกข้อมูลโภชนาการให้คุณ.".into(),
-                unknown: "⚠️ กรุณาส่งข้อความ รูป หรือเสียง.".into(),
+            "th" => Messages {
+                welcome: "ยินดีต้อนรับสู่บอทคำนวณแคลอรี่ของคุณ!".into(),
+                help: "บอทนี้ช่วยคุณติดตามแคลอรี่และสารอาหารรายวัน.".into(),
+                unknown: "ขออภัย ฉันไม่เข้าใจคำสั่งนั้น.".into(),
+                reset_done: "🔁 รีเซ็ตข้อมูลของวันนี้เรียบร้อยแล้ว.".into(),
+                week_empty: "ไม่มีข้อมูลในช่วง 7 วันที่ผ่านมา.".into(),
+                graph_error: "❌ เกิดข้อผิดพลาดในการสร้างกราฟ.".into(),
+                error: "❌ เกิดข้อผิดพลาด.".into(),
             },
-        );
-
-        langs.insert(
-            "zh",
-            Messages {
-                welcome: "👋 欢迎！告诉我你吃了什么，我来帮你计算！".into(),
-                help: "ℹ️ 请发送文本、食物照片或语音，我将提供热量和营养信息。".into(),
-                unknown: "⚠️ 请发送文字、图片或语音信息。".into(),
+            "zh" => Messages {
+                welcome: "欢迎使用您的卡路里助手！".into(),
+                help: "这个机器人可以帮助您追踪每日摄入的卡路里和营养成分。".into(),
+                unknown: "对不起，我不明白这条消息。".into(),
+                reset_done: "🔁 今天的数据已被重置。".into(),
+                week_empty: "过去 7 天没有记录。".into(),
+                graph_error: "❌ 绘图时出错。".into(),
+                error: "❌ 发生错误。".into(),
             },
-        );
-
-        langs.get(lang).cloned().unwrap_or_else(|| langs["en"].clone())
+            _ => Messages {
+                welcome: "Welcome!".into(),
+                help: "This bot helps track calories.".into(),
+                unknown: "I didn't understand.".into(),
+                reset_done: "🔁 Logs reset.".into(),
+                week_empty: "No data for last week.".into(),
+                graph_error: "❌ Chart error.".into(),
+                error: "❌ An error occurred.".into(),
+            },
+        }
     }
 }

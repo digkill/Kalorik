@@ -1,89 +1,245 @@
 use crate::db::queries;
 use crate::locales::messages::Messages;
+use crate::services::chart::draw_weekly_calories_chart;
 use teloxide::{
     prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Message, ParseMode},
 };
 
 pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
     let chat_id = msg.chat.id;
-    let user_lang = "ru"; // TODO: заменить на реальное извлечение из пользователя
-    let messages = Messages::get(user_lang);
+    let user_lang = queries::get_user(chat_id.0)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|u| u.language_code)
+        .unwrap_or("ru".to_string());
+    let messages = Messages::get(&user_lang);
 
-    // Обработка текстовых сообщений
     if let Some(text) = msg.text() {
         if text == "/start" {
             queries::register_user(chat_id.0).await.ok();
 
-            bot.send_message(chat_id, messages.welcome).await?;
+            bot.send_message(chat_id, &messages.welcome).await?;
 
             bot.send_message(
                 chat_id,
                 "🌐 Choose your language / Выберите язык / เลือกภาษา / 选择语言",
             )
-            .reply_markup(InlineKeyboardMarkup::new([
-                vec![
-                    InlineKeyboardButton::callback("🇷🇺 Русский", "lang_ru"),
-                    InlineKeyboardButton::callback("🇬🇧 English", "lang_en"),
-                ],
-                vec![
-                    InlineKeyboardButton::callback("🇹🇭 ไทย", "lang_th"),
-                    InlineKeyboardButton::callback("🇨🇳 中文", "lang_zh"),
-                ],
-            ]))
-            .await?;
+                .reply_markup(InlineKeyboardMarkup::new([
+                    vec![
+                        InlineKeyboardButton::callback("🇷🇺 Русский", "lang_ru"),
+                        InlineKeyboardButton::callback("🇬🇧 English", "lang_en"),
+                    ],
+                    vec![
+                        InlineKeyboardButton::callback("🇹🇭 ไทย", "lang_th"),
+                        InlineKeyboardButton::callback("🇨🇳 中文", "lang_zh"),
+                    ],
+                ]))
+                .await?;
         } else {
-            let result = crate::services::nutrition::analyze_food_description(text).await;
-            bot.send_message(chat_id, result).await?;
-        }
+            match crate::services::nutrition::analyze_food_description(text).await {
+                Ok((summary, suggestion)) => {
+                    queries::add_food_log(
+                        chat_id.0,
+                        &summary.name,
+                        summary.calories,
+                        summary.proteins,
+                        summary.fats,
+                        summary.carbs,
+                    )
+                        .await
+                        .ok();
 
-        if text == "/help" {
-            bot.send_message(chat_id, messages.help.clone()).await?;
+                    let (cal, pr, fa, ch) = queries::get_daily_summary(chat_id.0)
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::warn!("get_daily_summary failed: {}", e.to_string());
+                            (0.0, 0.0, 0.0, 0.0)
+                        });
+                    let response = format!(
+                        "✅ {}\n📊 Today: {:.0} kcal | 🥩 {:.1}P / 🧈 {:.1}F / 🍞 {:.1}C",
+                        suggestion, cal, pr, fa, ch
+                    );
+                    bot.send_message(chat_id, response).await?;
+                }
+                Err(e) => {
+                    log::error!("Error in analyze_food_description: {}", e);
+                    bot.send_message(chat_id, &messages.unknown).await?;
+                }
+            }
             return Ok(());
         }
 
-        return Ok(());
+        if text == "/help" {
+            bot.send_message(chat_id, &messages.help).await?;
+            return Ok(());
+        }
+
+        if text == "/stats" {
+            match queries
+
+            ::get_daily_summary(chat_id.0).await {
+                Ok((calories, proteins, fats, carbs)) => {
+                    let summary = format!(
+                        "\u{1F4CA} *Daily Summary:*\nKcal: `{}`\nProtein: `{}`g\nFat: `{}`g\nCarbs: `{}`g",
+                        calories, proteins, fats, carbs
+                    );
+                    bot.send_message(chat_id, summary)
+                        .parse_mode(ParseMode::MarkdownV2)
+                        .await?;
+                }
+                Err(e) => {
+                    log::error!("Error in get_daily_summary: {}", e.to_string());
+                    bot.send_message(chat_id, &messages.error).await?;
+                }
+            }
+            return Ok(());
+        }
+
+        if text == "/reset" {
+            match queries::reset_today_logs(chat_id.0).await {
+                Ok(()) => {
+                    bot.send_message(chat_id, &messages.reset_done).await?;
+                }
+                Err(e) => {
+                    log::error!("Error in reset_today_logs: {}", e.to_string());
+                    bot.send_message(chat_id, &messages.error).await?;
+                }
+            }
+            return Ok(());
+        }
+
+        if text == "/week" {
+            let weekly = queries::get_weekly_calories(chat_id.0)
+                .await
+                .unwrap_or_default();
+
+            if weekly.is_empty() {
+                bot.send_message(chat_id, &messages.week_empty).await?;
+            } else {
+                let data: Vec<(String, f32)> = weekly
+                    .into_iter()
+                    .map(|(date, val)| (date.format("%d.%m").to_string(), val))
+                    .collect();
+
+                let file_path = format!("temp/weekly_calories_{}.png", chat_id);
+                if let Err(e) = std::fs::create_dir_all("temp") {
+                    log::warn!("Failed to create temp directory: {}", e.to_string());
+                }
+
+                match draw_weekly_calories_chart(&data, &file_path) {
+                    Ok(_) => {
+                        if bot.send_photo(chat_id, InputFile::file(&file_path)).await.is_ok() {
+                            if let Err(e) = std::fs::remove_file(&file_path) {
+                                log::warn!("Failed to delete chart file {}: {}", file_path, e.to_string());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        {
+                            log::error!("Error drawing chart: {}", e.to_string());
+                        }
+                        bot.send_message(chat_id, &messages.graph_error).await?;
+                    }
+                }
+            }
+            return Ok(());
+        }
     }
 
-    // Обработка изображений
     if let Some(photos) = msg.photo() {
         if let Some(photo) = photos.last() {
             let file_id = &photo.file.id;
             let file = bot.get_file(file_id).send().await?;
             let token = std::env::var("TELEGRAM_BOT_TOKEN").unwrap();
             let url = format!("https://api.telegram.org/file/bot{}/{}", token, file.path);
-            let result = crate::services::nutrition::analyze_image(&url).await;
-            bot.send_message(chat_id, result).await?;
+
+            match crate::services::nutrition::analyze_image(&url).await {
+                Ok((summary, suggestion)) => {
+                    queries::add_food_log(
+                        chat_id.0,
+                        &summary.name,
+                        summary.calories,
+                        summary.proteins,
+                        summary.fats,
+                        summary.carbs,
+                    )
+                        .await
+                        .ok();
+
+                    let (cal, pr, fa, ch) = queries::get_daily_summary(chat_id.0)
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::warn!("get_daily_summary failed: {}", e.to_string());
+                            (0.0, 0.0, 0.0, 0.0)
+                        });
+                    let response = format!(
+                        "✅ {}\n📊 Today: {:.0} kcal | 🥩 {:.1}P / 🧈 {:.1}F / 🍞 {:.1}C",
+                        suggestion, cal, pr, fa, ch
+                    );
+                    bot.send_message(chat_id, response).await?;
+                }
+                Err(e) => {
+                    log::error!("Error in analyze_image: {}", e);
+                    bot.send_message(chat_id, &messages.unknown).await?;
+                }
+            }
         }
         return Ok(());
     }
 
-    // Обработка голосовых сообщений
     if let Some(voice) = msg.voice() {
         let file_id = &voice.file.id;
         let file = bot.get_file(file_id).send().await?;
         let token = std::env::var("TELEGRAM_BOT_TOKEN").unwrap();
         let url = format!("https://api.telegram.org/file/bot{}/{}", token, file.path);
-        let result = crate::services::nutrition::analyze_audio(&url).await;
-        bot.send_message(chat_id, result).await?;
+
+        match crate::services::nutrition::analyze_audio(&url).await {
+            Ok((summary, suggestion)) => {
+                queries::add_food_log(
+                    chat_id.0,
+                    &summary.name,
+                    summary.calories,
+                    summary.proteins,
+                    summary.fats,
+                    summary.carbs,
+                )
+                    .await
+                    .ok();
+
+                let (cal, pr, fa, ch) = queries::get_daily_summary(chat_id.0)
+                    .await
+                    .unwrap_or_else(|e| {
+                        log::warn!("get_daily_summary failed: {}", e.to_string());
+                        (0.0, 0.0, 0.0, 0.0)
+                    });
+                let response = format!(
+                    "✅ {}\n📊 Today: {:.0} kcal | 🥩 {:.1}P / 🧈 {:.1}F / 🍞 {:.1}C",
+                    suggestion, cal, pr, fa, ch
+                );
+                bot.send_message(chat_id, response).await?;
+            }
+            Err(e) => {
+                log::error!("Error in analyze_audio: {}", e);
+                bot.send_message(chat_id, &messages.unknown).await?;
+            }
+        }
         return Ok(());
     }
 
-    // По умолчанию
-    bot.send_message(chat_id, messages.unknown).await?;
+    bot.send_message(chat_id, &messages.unknown).await?;
     Ok(())
 }
 
-// Обработчик callback-запросов (в другом месте — обычно в dispatcher)
 pub async fn handle_callback(bot: Bot, q: CallbackQuery) -> ResponseResult<()> {
-    let query = q; // по сути, уже callback_query
-
-    if let Some(data) = query.data.as_deref() {
-        let chat_id = query
+    if let Some(data) = q.data.as_deref() {
+        let chat_id = q
             .message
             .as_ref()
             .map(|m| m.chat().id)
             .unwrap_or(ChatId(0));
+
         let lang_code = match data {
             "lang_ru" => "ru",
             "lang_en" => "en",

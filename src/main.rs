@@ -1,27 +1,39 @@
-use dotenvy::dotenv;
-use teloxide::prelude::*;
-mod db;
+use teloxide::{prelude::*, types::{Message, CallbackQuery}, dptree};
+use crate::telegram::handlers::{handle_message, handle_callback};
+
 mod telegram;
+mod db;
 mod services;
 mod locales;
 
 #[tokio::main]
 async fn main() {
-    dotenv().ok();
+    dotenvy::dotenv().ok();
     pretty_env_logger::init();
 
-    let pool = db::init().await.expect("DB init failed");
-    db::queries::set_pool(pool);
+    // Инициализация БД
+    let pool = db::init().await.expect("❌ Не удалось подключиться к базе данных");
+    crate::db::queries::set_pool(pool);
 
-    log::info!("🚀 Kalorik bot is running!");
-
+    // Telegram бот
     let bot = Bot::from_env();
 
-    let handler = dptree::entry()
-        .branch(Update::filter_message().endpoint(telegram::handlers::handle_message))
-        .branch(Update::filter_callback_query().endpoint(telegram::handlers::handle_callback));
+    let schema = dptree::entry()
+        .branch(
+            Update::filter_message()
+                .endpoint(|bot: Bot, msg: Message| async move {
+                    handle_message(bot, msg).await
+                }),
+        )
+        .branch(
+            Update::filter_callback_query()
+                .endpoint(|bot: Bot, q: CallbackQuery| async move {
+                    handle_callback(bot, q).await
+                }),
+        );
 
-    Dispatcher::builder(bot, handler)
+    Dispatcher::builder(bot.clone(), schema)
+        .enable_ctrlc_handler()
         .build()
         .dispatch()
         .await;

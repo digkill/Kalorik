@@ -3,19 +3,19 @@ use std::env;
 use std::error::Error;
 use std::fmt;
 
-const LANG_PROMPTS: &[(&str, &str, &str)] = &[
-    ("ru", "Отвечай на русском языке.", "Ответ должен быть строго в формате JSON: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
-    ("en", "Answer in English.", "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
-    ("th", "ตอบเป็นภาษาไทย.", "คำตอบต้องอยู่ในรูปแบบ JSON เท่านั้น: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
-    ("zh", "请用中文回答。", "回答必须严格采用 JSON 格式: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
+const LANG_PROMPTS: &[(&str, &str, &str, &str)] = &[
+    ("ru", "Отвечай на русском языке.", "Ответ должен быть строго в формате JSON: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}", "Рассчитай калории и БЖУ для"),
+    ("en", "Answer in English.", "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}", "Calculate calories and Proteins Fats Carbohydrates for"),
+    ("th", "ตอบเป็นภาษาไทย.", "คำตอบต้องอยู่ในรูปแบบ JSON เท่านั้น: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}", "คำนวณแคลอรี่และโปรตีน ไขมัน คาร์โบไฮเดรตสำหรับ"),
+    ("zh", "请用中文回答。", "回答必须严格采用 JSON 格式: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}", "计算卡路里和蛋白质脂肪碳水化合物"),
 ];
 
-fn get_lang_prompt(lang: &str) -> (&str, &str) {
+fn get_lang_prompt(lang: &str) -> (&str, &str, &str) {
     LANG_PROMPTS
         .iter()
-        .find(|&&(code, _, _)| code == lang)
-        .map(|&(_, p1, p2)| (p1, p2))
-        .unwrap_or(("Answer in English.", "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"))
+        .find(|&&(code, _, _, _)| code == lang)
+        .map(|&(_, p1, p2, p3)| (p1, p2, p3))
+        .unwrap_or(("Answer in English.", "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}", "Calculate calories and Proteins Fats Carbohydrates for"))
 }
 
 #[derive(Debug)]
@@ -75,7 +75,7 @@ pub struct FoodSummary {
 }
 
 pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSummary, String), NutritionError> {
-    let (lang_prompt, format_prompt) = get_lang_prompt(lang);
+    let (lang_prompt, format_prompt, prompt) = get_lang_prompt(lang);
 
     let api_key = env::var("OPENAI_API_KEY")?;
     let body = serde_json::json!({
@@ -87,7 +87,7 @@ pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSum
             },
             {
                 "role": "user",
-                "content": format!("Рассчитай калории и БЖУ для: {}", text)
+                "content": format!("{}: {}", prompt, text)
             }
         ],
         "temperature": 0.3
@@ -110,8 +110,8 @@ pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSum
     let name = text.to_string();
     let calories = extract_float(&content, "ккал").or_else(|| extract_float(&content, "kcal"));
     let proteins = extract_float(&content, "белк").or_else(|| extract_float(&content, "protein"));
-    let fats = extract_float(&content, "жир");
-    let carbs = extract_float(&content, "углев");
+    let fats = extract_float(&content, "жир").or_else(|| extract_float(&content, "fats"));
+    let carbs = extract_float(&content, "углев").or_else(|| extract_float(&content, "carbs"));
 
     Ok((
         FoodSummary {
@@ -134,7 +134,7 @@ fn extract_float(text: &str, key: &str) -> Option<f32> {
 }
 
 pub async fn analyze_image(url: &str, lang: &str) -> Result<(FoodSummary, String), NutritionError> {
-    let (lang_prompt, _) = get_lang_prompt(lang);
+    let (lang_prompt, _, _) = get_lang_prompt(lang);
 
     let api_key = env::var("OPENAI_API_KEY")?;
     let body = serde_json::json!({
@@ -142,7 +142,7 @@ pub async fn analyze_image(url: &str, lang: &str) -> Result<(FoodSummary, String
         "messages": [{
             "role": "user",
             "content": [
-                { "type": "text", "text": format!("{} Что изображено на этой еде? Сколько калорий и БЖУ?", lang_prompt) },
+                { "type": "text", "text": format!("{} What is depicted on this food? How many calories and Proteins Fats Carbohydrates?", lang_prompt) },
                 { "type": "image_url", "image_url": { "url": url } }
             ]
         }],

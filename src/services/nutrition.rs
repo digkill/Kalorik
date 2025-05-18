@@ -3,6 +3,21 @@ use std::env;
 use std::error::Error;
 use std::fmt;
 
+const LANG_PROMPTS: &[(&str, &str, &str)] = &[
+    ("ru", "Отвечай на русском языке.", "Ответ должен быть строго в формате JSON: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
+    ("en", "Answer in English.", "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
+    ("th", "ตอบเป็นภาษาไทย.", "คำตอบต้องอยู่ในรูปแบบ JSON เท่านั้น: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
+    ("zh", "请用中文回答。", "回答必须严格采用 JSON 格式: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"),
+];
+
+fn get_lang_prompt(lang: &str) -> (&str, &str) {
+    LANG_PROMPTS
+        .iter()
+        .find(|&&(code, _, _)| code == lang)
+        .map(|&(_, p1, p2)| (p1, p2))
+        .unwrap_or(("Answer in English.", "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}"))
+}
+
 #[derive(Debug)]
 pub struct NutritionError(String);
 
@@ -60,13 +75,7 @@ pub struct FoodSummary {
 }
 
 pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSummary, String), NutritionError> {
-    let lang_prompt = match lang {
-        "ru" => "Отвечай на русском языке.",
-        "en" => "Answer in English.",
-        "th" => "ตอบเป็นภาษาไทย.",
-        "zh" => "请用中文回答。",
-        _ => "Answer in English.",
-    };
+    let (lang_prompt, format_prompt) = get_lang_prompt(lang);
 
     let api_key = env::var("OPENAI_API_KEY")?;
     let body = serde_json::json!({
@@ -74,10 +83,7 @@ pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSum
         "messages": [
             {
                 "role": "system",
-                "content": format!(
-                    "{} Ответ должен быть строго в формате JSON: {{\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}}",
-                    lang_prompt
-                )
+                "content": format!("{} {}", lang_prompt, format_prompt)
             },
             {
                 "role": "user",
@@ -121,20 +127,14 @@ pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSum
 
 fn extract_float(text: &str, key: &str) -> Option<f32> {
     use regex::Regex;
-    let re = Regex::new(&format!(r"(?i)([\d.,]+)\s*{}", key)).ok()?;
+    let re = Regex::new(&format!(r"(?i)([\d.,]+)\\s*{}", key)).ok()?;
     let cap = re.captures(text)?;
     let val_str = cap.get(1)?.as_str().replace(",", ".");
     val_str.parse::<f32>().ok()
 }
 
 pub async fn analyze_image(url: &str, lang: &str) -> Result<(FoodSummary, String), NutritionError> {
-    let lang_prompt = match lang {
-        "ru" => "Отвечай на русском языке.",
-        "en" => "Answer in English.",
-        "th" => "ตอบเป็นภาษาไทย.",
-        "zh" => "请用中文回答。",
-        _ => "Answer in English.",
-    };
+    let (lang_prompt, _) = get_lang_prompt(lang);
 
     let api_key = env::var("OPENAI_API_KEY")?;
     let body = serde_json::json!({

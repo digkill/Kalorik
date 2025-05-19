@@ -1,6 +1,6 @@
 [package]
 name = "Kalorik"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]
@@ -18,7 +18,14 @@ tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 image = "0.25"
 rusttype = "0.9"
 regex = "1.11.1"
-
+env_logger = "0.10.2"
+actix-web = "4.11.0"
+base64 = { version = "0.22.1", features = [] }
+hmac = "0.12.1"
+sha2 = "0.10.9"
 [profile.release]
 strip = true
 opt-level = "z"
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.21"

@@ -101,7 +101,7 @@ fn draw_text(
                 if px >= 0 && px < image.width() as i32 && py >= 0 && py < image.height() as i32 {
                     let px = px as u32;
                     let py = py as u32;
-                    let alpha = (gv * 255.0) as u8;
+                    let _alpha = (gv * 255.0) as u8;
                     let pixel = image.get_pixel_mut(px, py);
                     // Blend the color with the background (white)
                     let bg = pixel.0;

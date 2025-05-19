@@ -1,7 +1,8 @@
 use crate::db::models::User;
 use sqlx::PgPool;
 use std::sync::OnceLock;
-use chrono::{NaiveDate, Utc, DateTime};
+use chrono::{NaiveDate, Utc, DateTime, NaiveDateTime};
+use chrono::TimeZone;
 
 pub static DB_POOL: OnceLock<PgPool> = OnceLock::new();
 
@@ -242,6 +243,34 @@ pub async fn extend_subscription(chat_id: i64, months: i32) -> Result<(), sqlx::
         "#,
         months,
         chat_id
+    )
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn update_subscription(user_id: i64, expires_at: &str) -> Result<(), sqlx::Error> {
+    let Some(pool) = DB_POOL.get() else {
+        return Err(sqlx::Error::PoolTimedOut);
+    };
+
+    // Parse the string into a chrono::DateTime with error handling
+    let naive_dt = match NaiveDateTime::parse_from_str(expires_at, "%Y-%m-%d %H:%M:%S") {
+        Ok(datetime) => datetime,
+        Err(e) => return Err(sqlx::Error::ColumnDecode {
+            index: "expires_at".to_string(),
+            source: Box::new(e),
+        }),
+    };
+
+    // Convert NaiveDateTime to DateTime<Utc>
+    let dt = Utc.from_utc_datetime(&naive_dt);
+
+    sqlx::query!(
+        "UPDATE users SET subscription_ends_at = $1 WHERE chat_id = $2",
+        dt,
+        user_id
     )
         .execute(pool)
         .await?;

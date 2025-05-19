@@ -69,7 +69,7 @@ pub async fn get_user(chat_id: i64) -> Result<Option<User>, sqlx::Error> {
         User,
         r#"
         SELECT id, chat_id, username, age, weight_kg, height_cm, gender,
-               activity_level, goal, imt, created_at, language_code, updated_at
+               activity_level, goal, imt, created_at, language_code, updated_at, subscription_ends_at
         FROM users
         WHERE chat_id = $1
         "#,
@@ -198,6 +198,49 @@ pub async fn reset_today_logs(chat_id: i64) -> Result<(), sqlx::Error> {
 
     sqlx::query!(
         "DELETE FROM food_logs WHERE chat_id = $1 AND created_at::date = CURRENT_DATE",
+        chat_id
+    )
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+/// Проверяет, активна ли подписка
+pub async fn is_subscription_active(chat_id: i64) -> Result<bool, sqlx::Error> {
+    let Some(pool) = DB_POOL.get() else {
+        return Err(sqlx::Error::PoolTimedOut);
+    };
+
+    let now = Utc::now();
+    let result = sqlx::query_scalar!(
+        "SELECT subscription_ends_at FROM users WHERE chat_id = $1",
+        chat_id
+    )
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(match result {
+        Some(Some(ends_at)) => ends_at > now,
+        _ => false,
+    })
+}
+
+/// Продлевает подписку на заданное количество месяцев
+pub async fn extend_subscription(chat_id: i64, months: i32) -> Result<(), sqlx::Error> {
+    let Some(pool) = DB_POOL.get() else {
+        return Err(sqlx::Error::PoolTimedOut);
+    };
+
+    sqlx::query!(
+        r#"
+        UPDATE users
+        SET subscription_ends_at =
+            COALESCE(subscription_ends_at, now()) + make_interval(months := $1),
+            updated_at = now()
+        WHERE chat_id = $2
+        "#,
+        months,
         chat_id
     )
         .execute(pool)

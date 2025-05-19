@@ -15,8 +15,13 @@ fn get_lang_prompt(lang: &str) -> (&str, &str, &str) {
         .iter()
         .find(|&&(code, _, _, _)| code == lang)
         .map(|&(_, p1, p2, p3)| (p1, p2, p3))
-        .unwrap_or(("Answer in English.", "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}", "Calculate calories and Proteins Fats Carbohydrates for"))
+        .unwrap_or((
+            "Answer in English.",
+            "The answer must be strictly in JSON format: {\"name\": \"...\", \"calories\": ..., \"proteins\": ..., \"fats\": ..., \"carbs\": ...}",
+            "Calculate calories and Proteins Fats Carbohydrates for"
+        ))
 }
+
 
 #[derive(Debug)]
 pub struct NutritionError(String);
@@ -127,7 +132,7 @@ pub async fn analyze_food_description(text: &str, lang: &str) -> Result<(FoodSum
 
 fn extract_float(text: &str, key: &str) -> Option<f32> {
     use regex::Regex;
-    let re = Regex::new(&format!(r"(?i)([\d.,]+)\\s*{}", key)).ok()?;
+    let re = Regex::new(&format!(r"(?i)([\\d.,]+)\\s*{}", key)).ok()?;
     let cap = re.captures(text)?;
     let val_str = cap.get(1)?.as_str().replace(",", ".");
     val_str.parse::<f32>().ok()

@@ -255,14 +255,20 @@ pub async fn update_subscription(user_id: i64, expires_at: &str) -> Result<(), s
         return Err(sqlx::Error::PoolTimedOut);
     };
 
-    // Parse the string into a chrono::DateTime with error handling
-    let naive_dt = match NaiveDateTime::parse_from_str(expires_at, "%Y-%m-%d %H:%M:%S") {
-        Ok(datetime) => datetime,
-        Err(e) => return Err(sqlx::Error::ColumnDecode {
-            index: "expires_at".to_string(),
-            source: Box::new(e),
-        }),
-    };
+    // Log the expires_at value for debugging
+    log::info!("Attempting to parse expires_at: {}", expires_at);
+
+    // Try parsing with multiple formats
+    let naive_dt = NaiveDateTime::parse_from_str(expires_at, "%Y-%m-%d %H:%M:%S")
+        .or_else(|_| NaiveDateTime::parse_from_str(expires_at, "%Y-%m-%dT%H:%M:%SZ"))
+        .or_else(|_| NaiveDateTime::parse_from_str(expires_at, "%Y-%m-%dT%H:%M:%S%.fZ"))
+        .map_err(|e| {
+            log::error!("Failed to parse expires_at '{}': {}", expires_at, e);
+            sqlx::Error::ColumnDecode {
+                index: "expires_at".to_string(),
+                source: Box::new(e),
+            }
+        })?;
 
     // Convert NaiveDateTime to DateTime<Utc>
     let dt = Utc.from_utc_datetime(&naive_dt);

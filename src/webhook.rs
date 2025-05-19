@@ -28,6 +28,9 @@ pub async fn subscription_callback(
     mac.update(&body);
     let expected = general_purpose::STANDARD.encode(mac.finalize().into_bytes());
 
+    println!("🚀 Webhook server running at http://{}", expected);
+    println!("🚀 Webhook server running at http://{}", signature);
+
     if expected != signature {
         log::warn!("Invalid webhook signature. Expected {}, got {}", expected, signature);
         return HttpResponse::Unauthorized().body("invalid signature");

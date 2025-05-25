@@ -1,13 +1,12 @@
 use crate::db::queries;
 use crate::locales::messages::Messages;
 use crate::services::chart::draw_weekly_calories_chart;
+use chrono::Utc;
+use reqwest::Url;
 use teloxide::{
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Message, ParseMode},
 };
-use chrono::Utc;
-use reqwest::Url;
-use crate::URL_LINK_PAY;
 
 pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
     let chat_id = msg.chat.id;
@@ -29,17 +28,17 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
                 chat_id,
                 "🌐 Choose your language / Выберите язык / เลือกภาษา / 选择语言",
             )
-                .reply_markup(InlineKeyboardMarkup::new([
-                    vec![
-                        InlineKeyboardButton::callback("🇷🇺 Русский", "lang_ru"),
-                        InlineKeyboardButton::callback("🇬🇧 English", "lang_en"),
-                    ],
-                    vec![
-                        InlineKeyboardButton::callback("🇹🇭 ไทย", "lang_th"),
-                        InlineKeyboardButton::callback("🇨🇳 中文", "lang_zh"),
-                    ],
-                ]))
-                .await?;
+            .reply_markup(InlineKeyboardMarkup::new([
+                vec![
+                    InlineKeyboardButton::callback("🇷🇺 Русский", "lang_ru"),
+                    InlineKeyboardButton::callback("🇬🇧 English", "lang_en"),
+                ],
+                vec![
+                    InlineKeyboardButton::callback("🇹🇭 ไทย", "lang_th"),
+                    InlineKeyboardButton::callback("🇨🇳 中文", "lang_zh"),
+                ],
+            ]))
+            .await?;
             return Ok(());
         }
 
@@ -102,9 +101,17 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
 
                 match draw_weekly_calories_chart(&data, &file_path) {
                     Ok(_) => {
-                        if bot.send_photo(chat_id, InputFile::file(&file_path)).await.is_ok() {
+                        if bot
+                            .send_photo(chat_id, InputFile::file(&file_path))
+                            .await
+                            .is_ok()
+                        {
                             if let Err(e) = std::fs::remove_file(&file_path) {
-                                log::warn!("Failed to delete chart file {}: {}", file_path, e.to_string());
+                                log::warn!(
+                                    "Failed to delete chart file {}: {}",
+                                    file_path,
+                                    e.to_string()
+                                );
                             }
                         }
                     }
@@ -140,15 +147,16 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
                     summary.fats,
                     summary.carbs,
                 )
-                    .await
-                    .ok();
+                .await
+                .ok();
 
-                let (cal, pr, fa, ch) = queries::get_daily_summary(chat_id.0)
-                    .await
-                    .unwrap_or_else(|e| {
-                        log::warn!("get_daily_summary failed: {}", e.to_string());
-                        (0.0, 0.0, 0.0, 0.0)
-                    });
+                let (cal, pr, fa, ch) =
+                    queries::get_daily_summary(chat_id.0)
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::warn!("get_daily_summary failed: {}", e.to_string());
+                            (0.0, 0.0, 0.0, 0.0)
+                        });
                 let response = format!(
                     "✅ {}\n📊 Today: {:.0} kcal | 🥩 {:.1}P / 🧈 {:.1}F / 🍞 {:.1}C",
                     suggestion, cal, pr, fa, ch
@@ -180,8 +188,8 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
                         summary.fats,
                         summary.carbs,
                     )
-                        .await
-                        .ok();
+                    .await
+                    .ok();
 
                     let (cal, pr, fa, ch) = queries::get_daily_summary(chat_id.0)
                         .await
@@ -220,15 +228,16 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
                     summary.fats,
                     summary.carbs,
                 )
-                    .await
-                    .ok();
+                .await
+                .ok();
 
-                let (cal, pr, fa, ch) = queries::get_daily_summary(chat_id.0)
-                    .await
-                    .unwrap_or_else(|e| {
-                        log::warn!("get_daily_summary failed: {}", e.to_string());
-                        (0.0, 0.0, 0.0, 0.0)
-                    });
+                let (cal, pr, fa, ch) =
+                    queries::get_daily_summary(chat_id.0)
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::warn!("get_daily_summary failed: {}", e.to_string());
+                            (0.0, 0.0, 0.0, 0.0)
+                        });
                 let response = format!(
                     "✅ {}\n📊 Today: {:.0} kcal | 🥩 {:.1}P / 🧈 {:.1}F / 🍞 {:.1}C",
                     suggestion, cal, pr, fa, ch
@@ -249,11 +258,7 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
 
 pub async fn handle_callback(bot: Bot, q: CallbackQuery) -> ResponseResult<()> {
     if let Some(data) = q.data.as_deref() {
-        let chat_id = q
-            .message
-            .as_ref()
-            .map(|m| m.chat().id)
-            .unwrap_or(ChatId(0));
+        let chat_id = q.message.as_ref().map(|m| m.chat().id).unwrap_or(ChatId(0));
 
         let lang_code = match data {
             "lang_ru" => "ru",
@@ -287,10 +292,8 @@ pub async fn handle_subscribe(bot: Bot, msg: Message) -> ResponseResult<()> {
         .flatten()
         .and_then(|u| u.language_code)
         .unwrap_or("ru".to_string());
- //   let messages = Messages::get(&user_lang);
-
- 
-    let payment_url = format!("{}/subscribe?user_id={}", URL_LINK_PAY, chat_id.0);
+    //   let messages = Messages::get(&user_lang);
+    let payment_url = get_url_link_pay(chat_id.0);
     let subscribe_text = match user_lang.as_str() {
         "ru" => "🛒 Оформите подписку за 299 ₽ в месяц, чтобы продолжить пользоваться ботом!",
         "en" => "🛒 Subscribe for 299 RUB/month to continue using the bot!",
@@ -300,9 +303,9 @@ pub async fn handle_subscribe(bot: Bot, msg: Message) -> ResponseResult<()> {
     };
 
     bot.send_message(chat_id, subscribe_text)
-        .reply_markup(InlineKeyboardMarkup::new(vec![
-            vec![InlineKeyboardButton::url("💳 Оформить подписку", Url::parse(&payment_url).unwrap())],
-        ]))
+        .reply_markup(InlineKeyboardMarkup::new(vec![vec![
+            InlineKeyboardButton::url("💳 Оформить подписку", Url::parse(&payment_url).unwrap()),
+        ]]))
         .await?;
 
     Ok(())
@@ -326,14 +329,16 @@ pub async fn prompt_subscription(bot: &Bot, chat_id: ChatId, lang: &str) {
         _ => "🔒 Subscription required. Please subscribe.",
     };
 
+    let payment_url = get_url_link_pay(chat_id.0);
+    let markup = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::url(
+        "💳 Оформить подписку",
+        Url::parse(&payment_url).unwrap(),
+    )]]);
 
- 
-    let payment_url = format!("{}/subscribe?user_id={}", URL_LINK_PAY, chat_id.0);
-    let markup = InlineKeyboardMarkup::new(vec![
-        vec![InlineKeyboardButton::url("💳 Оформить подписку", Url::parse(&payment_url).unwrap())],
-    ]);
-
-    bot.send_message(chat_id, text).reply_markup(markup).await.ok();
+    bot.send_message(chat_id, text)
+        .reply_markup(markup)
+        .await
+        .ok();
 }
 
 pub async fn send_daily_tip(bot: &Bot, chat_id: ChatId, lang: &str) {
@@ -349,8 +354,7 @@ pub async fn send_daily_tip(bot: &Bot, chat_id: ChatId, lang: &str) {
 
 pub async fn handle_subscribe_command(bot: &Bot, msg: &Message, lang: &str) {
     let chat_id = msg.chat.id;
- 
-    let payment_url = format!("{}/subscribe?user_id={}", URL_LINK_PAY, chat_id.0);
+    let payment_url = get_url_link_pay(chat_id.0);
     let subscribe_text = match lang {
         "ru" => "🛒 Оформите подписку за 299 ₽ в месяц, чтобы продолжить пользоваться ботом!",
         "en" => "🛒 Subscribe for 299 RUB/month to continue using the bot!",
@@ -358,9 +362,10 @@ pub async fn handle_subscribe_command(bot: &Bot, msg: &Message, lang: &str) {
         "zh" => "🛒 每月299卢布订阅，以继续使用机器人！",
         _ => "🛒 Subscribe for 299 RUB/month to continue using the bot!",
     };
-    let markup = InlineKeyboardMarkup::new(vec![
-        vec![InlineKeyboardButton::url("💳 Оформить подписку", Url::parse(&payment_url).unwrap())],
-    ]);
+    let markup = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::url(
+        "💳 Оформить подписку",
+        Url::parse(&payment_url).unwrap(),
+    )]]);
     bot.send_message(chat_id, subscribe_text)
         .reply_markup(markup)
         .await
@@ -389,4 +394,10 @@ pub async fn handle_cancel_command(bot: &Bot, msg: &Message, lang: &str) {
         _ => "❗ To cancel, go to your payment provider’s subscription section.",
     };
     bot.send_message(chat_id, text).await.ok();
+}
+
+fn get_url_link_pay(chat_id: i64) -> String {
+    let url_link_pay = std::env::var("URL_LINK_PAY").unwrap();
+    let url = format!("{}/subscribe?user_id={}", url_link_pay, chat_id);
+    url
 }

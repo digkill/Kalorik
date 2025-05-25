@@ -11,7 +11,6 @@ mod locales;
 mod services;
 mod telegram;
 mod webhook;
-pub const URL_LINK_PAY: &'static str = env!("URL_LINK_PAY");
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -20,7 +19,6 @@ async fn main() -> std::io::Result<()> {
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".into());
     let port = std::env::var("PORT").unwrap_or_else(|_| "8282".into());
-    let url_pay_link = std::env::var("URL_LINK_PAY").unwrap_or_else(|_| "http://localhost:8383".into());
     let addr = format!("{}:{}", host, port);
 
     // Initialize the database

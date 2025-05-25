@@ -7,6 +7,7 @@ use teloxide::{
 };
 use chrono::Utc;
 use reqwest::Url;
+use crate::URL_LINK_PAY;
 
 pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
     let chat_id = msg.chat.id;
@@ -288,7 +289,8 @@ pub async fn handle_subscribe(bot: Bot, msg: Message) -> ResponseResult<()> {
         .unwrap_or("ru".to_string());
  //   let messages = Messages::get(&user_lang);
 
-    let payment_url = format!("https://your-payment-provider.com/subscribe?user_id={}", chat_id.0);
+ 
+    let payment_url = format!("{}/subscribe?user_id={}", URL_LINK_PAY, chat_id.0);
     let subscribe_text = match user_lang.as_str() {
         "ru" => "🛒 Оформите подписку за 299 ₽ в месяц, чтобы продолжить пользоваться ботом!",
         "en" => "🛒 Subscribe for 299 RUB/month to continue using the bot!",
@@ -324,7 +326,9 @@ pub async fn prompt_subscription(bot: &Bot, chat_id: ChatId, lang: &str) {
         _ => "🔒 Subscription required. Please subscribe.",
     };
 
-    let payment_url = format!("https://your-payment-provider.com/subscribe?user_id={}", chat_id.0);
+
+ 
+    let payment_url = format!("{}/subscribe?user_id={}", URL_LINK_PAY, chat_id.0);
     let markup = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::url("💳 Оформить подписку", Url::parse(&payment_url).unwrap())],
     ]);
@@ -345,7 +349,8 @@ pub async fn send_daily_tip(bot: &Bot, chat_id: ChatId, lang: &str) {
 
 pub async fn handle_subscribe_command(bot: &Bot, msg: &Message, lang: &str) {
     let chat_id = msg.chat.id;
-    let payment_url = format!("https://your-payment-provider.com/subscribe?user_id={}", chat_id.0);
+ 
+    let payment_url = format!("{}/subscribe?user_id={}", URL_LINK_PAY, chat_id.0);
     let subscribe_text = match lang {
         "ru" => "🛒 Оформите подписку за 299 ₽ в месяц, чтобы продолжить пользоваться ботом!",
         "en" => "🛒 Subscribe for 299 RUB/month to continue using the bot!",

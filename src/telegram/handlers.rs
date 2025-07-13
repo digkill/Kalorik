@@ -2,6 +2,7 @@ use crate::db::queries;
 use crate::locales::messages::Messages;
 use crate::services::chart::draw_weekly_calories_chart;
 use chrono::Utc;
+use log::error;
 use reqwest::Url;
 use teloxide::{
     prelude::*,
@@ -125,7 +126,9 @@ pub async fn handle_message(bot: Bot, msg: Message) -> ResponseResult<()> {
         }
 
         if text == "/subscribe" {
-            handle_subscribe_command(&bot, &msg, &user_lang).await;
+            if let Err(err) = handle_subscribe_command(&bot, &msg, "ru").await {
+                log::error!("Ошибка подписки: {}", err);
+            }
             return Ok(());
         }
         if text == "/status" {
@@ -352,9 +355,21 @@ pub async fn send_daily_tip(bot: &Bot, chat_id: ChatId, lang: &str) {
     bot.send_message(chat_id, tip).await.ok();
 }
 
-pub async fn handle_subscribe_command(bot: &Bot, msg: &Message, lang: &str) {
+pub async fn handle_subscribe_command(bot: &Bot, msg: &Message, lang: &str) -> Result<(), Box<dyn std::error::Error>> {
     let chat_id = msg.chat.id;
     let payment_url = get_url_link_pay(chat_id.0);
+
+    // Парсим ссылку
+    let parsed_url = match Url::parse(&payment_url) {
+        Ok(url) => url,
+        Err(err) => {
+            error!("❌ Invalid payment URL: {} — {:?}", payment_url, err);
+            bot.send_message(chat_id, "⚠️ Ошибка при генерации ссылки для оплаты. Попробуйте позже.")
+                .await?;
+            return Err(Box::new(err));
+        }
+    };
+
     let subscribe_text = match lang {
         "ru" => "🛒 Оформите подписку за 299 ₽ в месяц, чтобы продолжить пользоваться ботом!",
         "en" => "🛒 Subscribe for 299 RUB/month to continue using the bot!",
@@ -362,16 +377,22 @@ pub async fn handle_subscribe_command(bot: &Bot, msg: &Message, lang: &str) {
         "zh" => "🛒 每月299卢布订阅，以继续使用机器人！",
         _ => "🛒 Subscribe for 299 RUB/month to continue using the bot!",
     };
-    let markup = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::url(
-        "💳 Оформить подписку",
-        Url::parse(&payment_url).unwrap(),
-    )]]);
-    bot.send_message(chat_id, subscribe_text)
+
+    let markup = InlineKeyboardMarkup::new(vec![vec![
+        InlineKeyboardButton::url("💳 Оформить подписку", parsed_url)
+    ]]);
+
+    // Отправка сообщения
+    if let Err(err) = bot.send_message(chat_id, subscribe_text)
         .reply_markup(markup)
         .await
-        .ok();
-}
+    {
+        error!("❌ Failed to send subscribe message: {:?}", err);
+        return Err(Box::new(err));
+    }
 
+    Ok(())
+}
 pub async fn handle_status_command(bot: &Bot, msg: &Message, lang: &str) {
     let chat_id = msg.chat.id;
     let active = check_subscription(chat_id).await;
@@ -397,7 +418,8 @@ pub async fn handle_cancel_command(bot: &Bot, msg: &Message, lang: &str) {
 }
 
 fn get_url_link_pay(chat_id: i64) -> String {
-    let url_link_pay = std::env::var("URL_LINK_PAY").unwrap();
+    let url_link_pay = std::env::var("URL_LINK_PAY").expect("⚠️ URL_LINK_PAY env not set");
     let url = format!("{}/subscribe?user_id={}", url_link_pay, chat_id);
+    println!("🔗 Generated URL: {}", url);
     url
 }
